@@ -1,0 +1,1748 @@
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <title>Hierarchical EMV Demo</title>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.js"></script>
+
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+
+
+    <style>
+        body {
+            background: white;
+            font-family: Helvetica, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100% - 34px); /* Full height - top buttons */
+            overflow: hidden; /* Hide overflow */
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .column {
+            padding: 20px;
+            box-sizing: border-box;
+            overflow: auto;
+        }
+
+        .column-left {
+            width: 40%;
+            overflow: auto;
+        }
+
+        .column-right-scrolling {
+            width: 60%;
+            overflow: auto;
+        }
+
+        .column-right-scaling {
+            overflow: unset;
+            position: relative; /* to allow scaling */
+            top: 0;
+            left: 0;
+            transform-origin: top center; /* Scale from top-left */
+            width: 60%;
+            height: fit-content;
+        }
+
+        @media (max-width: 850px) {
+            .container {
+                flex-direction: column;
+                height: unset;
+            }
+
+            .column-left, .column-right-scaling, .column-right-scrolling {
+                width: 100%;
+                overflow: unset;
+            }
+
+            .hidden-sm {
+                display: none;
+            }
+        }
+
+        .node {
+            display: flex;
+            flex-direction: row;
+            align-items: baseline;
+            overflow: hidden;
+            transition: all 0.5s;
+            max-height: 50px;
+            opacity: 1;
+        }
+
+        .child-container {
+            display: flex;
+            flex-direction: column;
+            border: 0 solid currentColor;
+            border-left-width: 1px;
+            margin-left: 20px;
+        }
+
+        .child-container.l0 {
+            color: black;
+        }
+
+        .child-container.l1 {
+            color: rgb(70, 70, 70);
+        }
+
+        .child-container.l2 {
+            color: rgb(120, 120, 120);
+        }
+
+        .child-container.l3 {
+            color: rgb(160, 160, 160);
+        }
+
+        .child-container.l4 {
+            color: rgb(200, 200, 200);
+        }
+
+        .child-container:not(.collapsed)::after {
+            content: '';
+            height: 22px;
+            margin-top: -22px;
+            border: solid white;
+            border-width: 0 0 0 4px;
+            position: relative;
+            left: -2px;
+        }
+
+        .node-children-indicator {
+            overflow: hidden;
+            box-sizing: border-box;
+            transition: all 0.5s;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            max-height: 50px;
+            opacity: 1;
+        }
+
+        .collapsed {
+            max-height: 0 !important;
+            opacity: 0 !important;
+        }
+
+
+        .node > * {
+            padding: 0 5px;
+        }
+
+        .node-children-indicator > * {
+            padding: 15px;
+        }
+
+        .node-icon {
+            flex-shrink: 0;
+            width: 30px;
+            padding: 0;
+            height: 0;
+            align-self: center;
+            border: solid;
+            border-width: 1px 0 0 0;
+            box-sizing: content-box;
+        }
+
+        .node-icon-2 {
+            flex-shrink: 0;
+            position: relative;
+            top: 20px;
+            right: 10px;
+            padding: 0;
+            height: 25px;
+            border: solid;
+            filter: brightness(120%);
+            border-width: 0 1px 0 0;
+        }
+
+        .l4 .node-icon-2 {
+            filter: none;
+        }
+
+        .leaf > .node-icon-2 {
+            border: none;
+        }
+
+        .node-idx, .node-dt {
+            color: rgb(100, 100, 100);
+        }
+
+        .node-idx::after {
+            content: ':';
+        }
+
+        .node-summary {
+            color: black;
+        }
+
+        button {
+            background: #0084ff;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 14px;
+            font-size: 15px;
+            color: #fff;
+        }
+
+    </style>
+
+    <style>
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 85%;
+            clear: both;
+            position: relative;
+            max-height: 150px;
+            opacity: 1;
+            transition: all 0.5s;
+            font-size: 15px;
+            font-family: monospace;
+            overflow: clip;
+        }
+
+        .message.from-human {
+            background-color: #eceae1;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.from-bot {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            margin-right: auto;
+            text-align: left;
+        }
+
+        .message.initial, .message.answer {
+            text-align: center;
+            margin-right: auto;
+            margin-left: auto;
+            font-weight: bold;
+            font-family: Helvetica, sans-serif;
+        }
+
+        .message.initial {
+            background-color: lightcyan;
+        }
+
+        .message.answer {
+            background-color: #d5ffd5;
+        }
+    </style>
+
+
+</head>
+<body>
+
+<div id="button-bar">
+    <button id="button-animate">
+        Animate
+    </button>
+    <button id="button-prev">
+        Previous
+    </button>
+    <button id="button-next">
+        Next
+    </button>
+
+    <label class="hidden-sm" style="margin-left: 30px">
+        <input type="checkbox" id="scale-or-scroll-checkbox" onchange="toggleScalingOrScrolling()">
+        Scale tree to fit
+    </label>
+</div>
+
+
+<div class="container">
+    <div class="column column-left">
+        <div class="chat-container">
+            <div class="message initial" id="msg-0">Did we see a bride at a touristic place?</div>
+<div class="message from-bot" id="msg-1">history.search("touristic place")</div>
+<div class="message from-bot" id="msg-2">history.search("bride")</div>
+<div class="message from-bot" id="msg-3">history[0].search("bride")</div>
+<div class="message from-bot" id="msg-4">history[0].collapse_all_but(5); history[0][5].expand()</div>
+<div class="message from-human" id="msg-5">'Index 5 out of range (length 3). Revise the code carefully to avoid this error.'</div>
+<div class="message from-bot" id="msg-6">history[0].collapse_all_but(1); history[0][1].expand()</div>
+<div class="message from-bot" id="msg-7">history[0].collapse_all_but(2); history[0][2].expand()</div>
+<div class="message from-bot" id="msg-8">history[0][2].search("bride")</div>
+<div class="message from-bot" id="msg-9">history[0][2][0].expand()</div>
+<div class="message from-bot" id="msg-10">history[0][2][0].collapse_all_but(0); history[0][2][0][0].expand()</div>
+<div class="message from-bot" id="msg-11">history[0][2][0][0].search("bride")</div>
+<div class="message from-human" id="msg-12">'Nothing changed. Ensure the node you are accessing itself is expanded, try a different selector, or expand() without arguments to see all children. Find the information the user is looking for and then answer the question.'</div>
+<div class="message from-bot" id="msg-13">history[0][2][0][0].expand()</div>
+<div class="message from-human" id="msg-14">'Nothing changed. Ensure the node you are accessing itself is expanded, try a different selector, or expand() without arguments to see all children. Find the information the user is looking for and then answer the question.'</div>
+<div class="message from-bot" id="msg-15">history.expand()</div>
+<div class="message from-bot" id="msg-16">history[0][2][0][0][0].expand()</div>
+<div class="message from-human" id="msg-17">'Nothing changed. Ensure the node you are accessing itself is expanded, try a different selector, or expand() without arguments to see all children. Find the information the user is looking for and then answer the question.'</div>
+<div class="message from-bot" id="msg-18">history[0][2][0][0][0].expand()</div>
+<div class="message from-human" id="msg-19">Max rounds reached. Forcing answer now.</div>
+<div class="message from-bot" id="msg-20">answer(reasoning="The history does not mention any specific observation of a bride at a touristic place. The activities described include visiting a museum, shops, and a supermarket, but there is no mention of a bride.", answer="No, we did not see a bride at a touristic place.")</div>
+<div class="message answer" id="msg-21">No, we did not see a bride at a touristic place.</div>
+
+        </div>
+    </div>
+
+    <div class="column column-right-scrolling" id="tree-column">
+        
+        <div class="node " id="node-0">
+            <i class="node-icon"style="margin-left: 17px; height: 2px; width: 2px; margin-right:7px; border-width: 2px; border-radius: 2px; background-color: gray"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2022/05/13 14:42 - 19:10</p>
+            <p class="node-summary">Throughout the day, I engaged in various activities such as interacting with people at home and in public spaces, visiting a museum, shops, and a supermarket, while observing my surroundings and occasionally using my phone. I ended the day by enjoying some ice cream and food.</p>
+        </div><div class="child-container l0" id="child-container-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2022/05/13 14:42 - 14:51</p>
+            <p class="node-summary">I began my day at home interacting with people before heading outside to walk around, interact with more people, and observe my surroundings.</p>
+        </div><div class="child-container l1" id="child-container-0-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2022/05/13 14:43 - 14:47</p>
+            <p class="node-summary">I went outside, walked on the pavement, interacted with a lady, and observed my surroundings.</p>
+        </div><div class="child-container l2" id="child-container-0-0-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-1-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2022/05/13 14:43:02 - 14:44:01</p>
+            <p class="node-summary">Goal: I was outside, walked on the pavement and looked around.<br>  Visual observation: doormat</p>
+        </div><div class="child-container l3" id="child-container-0-0-1-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-1-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2022/05/13 14:44:02 - 14:45:01</p>
+            <p class="node-summary">Goal: I was outside, walked on the pavement and interacted with a lady X.<br>  Visual observation: soccer ball, postbox (public), trash can, can, trash can</p>
+        </div><div class="child-container l3" id="child-container-0-0-1-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-1-2">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">2</p>
+            <p class="node-dt">2022/05/13 14:45:02 - 14:46:01</p>
+            <p class="node-summary">Goal: I was outside, walked on the pavement and interacted with a woman X.<br>  Visual observation: ball, ball</p>
+        </div><div class="child-container l3" id="child-container-0-0-1-2">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-2--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-2">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-1-3">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">3</p>
+            <p class="node-dt">2022/05/13 14:46:02 - 14:47:01</p>
+            <p class="node-summary">Goal: I was outside, walked around and looked around.</p>
+        </div><div class="child-container l3" id="child-container-0-0-1-3">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-3--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1-3">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">2</p>
+            <p class="node-dt">2022/05/13 14:47 - 14:51</p>
+            <p class="node-summary">I continued walking outside, crossing roads, and interacting with various people.</p>
+        </div><div class="child-container l2" id="child-container-0-0-2">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2022/05/13 14:47:02 - 14:48:01</p>
+            <p class="node-summary">Goal: I was outside, walked on the pavement and crossed the road.<br>  Visual observation: sunhat, trousers, sidewalk, sombrero, commute, pavement, doormat, shoe, skirt</p>
+        </div><div class="child-container l3" id="child-container-0-0-2-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2022/05/13 14:47:02 - 14:47:02</p>
+            <p class="node-summary">Action: I looked around the compound<br>  Visual observation: pedestrian, pavement, pedestrian.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node  leaf" id="node-0-0-2-0-0-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt"></p>
+            <p class="node-summary">SceneGraphInstant(objects=[ObjectNode(obj_class='pedestrian', instance_id='pedestrian_0', state=None), ObjectNode(obj_class='pavement', instance_id='pavement_0', state=None), ObjectNode(obj_class='pedestrian', instance_id='pedestrian_1', state=None)], relations=[], raw=RawDataInstant(timestamp=datetime.datetime(2022, 5, 13, 14, 47, 2), image=&lt;PIL.Image.Image ...&gt;, sound=None, asr_recognition=None, current_action='I looked around the compound', current_action_state=None, current_action_parameters=None, current_goal='C was outside, walked on the pavement and crossed the road.', current_goal_state=None))</p>
+        </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-0-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2022/05/13 14:47:03 - 14:47:03</p>
+            <p class="node-summary">Action: I looked around the street<br>  Visual observation: pavement, ball, pedestrian, street.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-2">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">2</p>
+            <p class="node-dt">2022/05/13 14:47:04 - 14:47:04</p>
+            <p class="node-summary">Action: I walked on the road<br>  Visual observation: pedestrian, pavement, street, handbag, handbag, road, pedestrian, handbag, sidewalk.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-2">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-2--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-2">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-3">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">3</p>
+            <p class="node-dt">2022/05/13 14:47:05 - 14:47:05</p>
+            <p class="node-summary">Action: I walked on the road<br>  Visual observation: street, pavement, handbag, road, handcart, handbag, pedestrian, pedestrian.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-3">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-3--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-3">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-4">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">4</p>
+            <p class="node-dt">2022/05/13 14:47:06 - 14:47:06</p>
+            <p class="node-summary">Action: A woman Y walked on the<br>  Visual observation: ball, handbag, sidewalk, handbag, pavement, handbag, handbag, street, skirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-4">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-4--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-4">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-5">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">5</p>
+            <p class="node-dt">2022/05/13 14:47:07 - 14:47:07</p>
+            <p class="node-summary">Action: I looked around<br>  Visual observation: pedestrian, ball, sunhat, pedestrian, pavement, pedestrian, street.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-5">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-5--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-5">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-6">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">6</p>
+            <p class="node-dt">2022/05/13 14:47:08 - 14:47:08</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: pedestrian, sunhat, pedestrian, pavement.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-6">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-6--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-6">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-7">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">7</p>
+            <p class="node-dt">2022/05/13 14:47:09 - 14:47:09</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: pedestrian, pedestrian.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-7">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-7--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-7">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-8">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">8</p>
+            <p class="node-dt">2022/05/13 14:47:10 - 14:47:10</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: pedestrian, pedestrian.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-8">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-8--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-8">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-9">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">9</p>
+            <p class="node-dt">2022/05/13 14:47:11 - 14:47:11</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: pedestrian, handcart, pedestrian, street, pavement.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-9">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-9--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-9">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-10">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">10</p>
+            <p class="node-dt">2022/05/13 14:47:12 - 14:47:12</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: pedestrian, pedestrian, pedestrian, pavement, sunhat, pedestrian.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-10">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-10--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-10">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-11">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">11</p>
+            <p class="node-dt">2022/05/13 14:47:13 - 14:47:13</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: pedestrian, pedestrian, pedestrian, pedestrian, sunhat, pedestrian, skirt, pavement, sidewalk.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-11">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-11--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-11">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-12">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">12</p>
+            <p class="node-dt">2022/05/13 14:47:14 - 14:47:14</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: pedestrian, pedestrian, sidewalk, ball, ball, pedestrian, pavement, pedestrian.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-12">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-12--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-12">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-13">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">13</p>
+            <p class="node-dt">2022/05/13 14:47:15 - 14:47:15</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: pedestrian, ball, pedestrian, pavement, sunhat, pedestrian, pedestrian, skirt, sidewalk.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-13">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-13--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-13">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-14">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">14</p>
+            <p class="node-dt">2022/05/13 14:47:16 - 14:47:16</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: pedestrian, handbag.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-14">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-14--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-14">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-15">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">15</p>
+            <p class="node-dt">2022/05/13 14:47:17 - 14:47:17</p>
+            <p class="node-summary">Action: I adjusted my hair with my right hand<br>  Visual observation: trousers.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-15">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-15--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-15">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-16">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">16</p>
+            <p class="node-dt">2022/05/13 14:47:18 - 14:47:18</p>
+            <p class="node-summary">Action: I adjusted my hair with my right hand<br>  Visual observation: manhole, flowerpot.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-16">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-16--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-16">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-17">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">17</p>
+            <p class="node-dt">2022/05/13 14:47:19 - 14:47:19</p>
+            <p class="node-summary">Action: I looked at the road<br>  Visual observation: manhole.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-17">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-17--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-17">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-18">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">18</p>
+            <p class="node-dt">2022/05/13 14:47:20 - 14:47:20</p>
+            <p class="node-summary">Action: I looked around<br>  Visual observation: manhole.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-18">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-18--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-18">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-19">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">19</p>
+            <p class="node-dt">2022/05/13 14:47:21 - 14:47:21</p>
+            <p class="node-summary">Action: I looked around<br>  Visual observation: manhole, ball.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-19">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-19--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-19">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-20">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">20</p>
+            <p class="node-dt">2022/05/13 14:47:22 - 14:47:22</p>
+            <p class="node-summary">Action: I looked around<br>  Visual observation: pedestrian, ball, sunhat, ball, flowerpot.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-20">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-20--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-20">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-21">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">21</p>
+            <p class="node-dt">2022/05/13 14:47:23 - 14:47:23</p>
+            <p class="node-summary">Action: I looked around<br>  Visual observation: manhole.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-21">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-21--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-21">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-22">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">22</p>
+            <p class="node-dt">2022/05/13 14:47:24 - 14:47:24</p>
+            <p class="node-summary">Action: I adjusted the camera<br>  Visual observation: manhole, ball.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-22">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-22--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-22">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-23">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">23</p>
+            <p class="node-dt">2022/05/13 14:47:25 - 14:47:25</p>
+            <p class="node-summary">Action: I adjusted the camera<br>  Visual observation: ball, doormat, ball.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-23">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-23--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-23">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-24">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">24</p>
+            <p class="node-dt">2022/05/13 14:47:26 - 14:47:26</p>
+            <p class="node-summary">Action: I adjusted the camera on my head with my right hand<br>  Visual observation: flowerpot, manhole, ball.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-24">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-24--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-24">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-25">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">25</p>
+            <p class="node-dt">2022/05/13 14:47:27 - 14:47:27</p>
+            <p class="node-summary">Action: A woman X walked on the pavement<br>  Visual observation: sunhat, ball, trousers, sombrero, shoe, fedora.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-25">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-25--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-25">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-26">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">26</p>
+            <p class="node-dt">2022/05/13 14:47:28 - 14:47:28</p>
+            <p class="node-summary">Action: I walked around the street<br>  Visual observation: ball.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-26">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-26--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-26">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-27">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">27</p>
+            <p class="node-dt">2022/05/13 14:47:29 - 14:47:29</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: postbox (public), pavement, pedestrian, ball, ball, sidewalk.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-27">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-27--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-27">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-28">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">28</p>
+            <p class="node-dt">2022/05/13 14:47:30 - 14:47:30</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: ball.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-28">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-28--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-28">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-29">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">29</p>
+            <p class="node-dt">2022/05/13 14:47:31 - 14:47:31</p>
+            <p class="node-summary">Action: I walked on the sidewalk<br>  Visual observation: pavement.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-29">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-29--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-29">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-30">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">30</p>
+            <p class="node-dt">2022/05/13 14:47:32 - 14:47:32</p>
+            <p class="node-summary">Action: A woman X walked on the<br>  Visual observation: pavement, sidewalk.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-30">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-30--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-30">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-31">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">31</p>
+            <p class="node-dt">2022/05/13 14:47:33 - 14:47:33</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: shirt, polo shirt, sidewalk, shoe.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-31">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-31--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-31">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-32">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">32</p>
+            <p class="node-dt">2022/05/13 14:47:34 - 14:47:34</p>
+            <p class="node-summary">Action: Man X walked around<br>  Visual observation: shoe, polo shirt, shirt, bib.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-32">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-32--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-32">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-33">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">33</p>
+            <p class="node-dt">2022/05/13 14:47:35 - 14:47:35</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: sidewalk, skirt, shoe, pavement, trousers.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-33">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-33--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-33">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-34">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">34</p>
+            <p class="node-dt">2022/05/13 14:47:36 - 14:47:36</p>
+            <p class="node-summary">Action: I walked on the road<br>  Visual observation: trousers, shoe, sidewalk, short pants.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-34">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-34--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-34">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-35">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">35</p>
+            <p class="node-dt">2022/05/13 14:47:37 - 14:47:37</p>
+            <p class="node-summary">Action: Man A walked on the road<br>  Visual observation: sidewalk, trousers, pavement, polo shirt, shoe, shirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-35">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-35--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-35">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-36">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">36</p>
+            <p class="node-dt">2022/05/13 14:47:38 - 14:47:38</p>
+            <p class="node-summary">Action: I walked along the road<br>  Visual observation: sidewalk, trousers, polo shirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-36">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-36--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-36">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-37">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">37</p>
+            <p class="node-dt">2022/05/13 14:47:39 - 14:47:39</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: pedestrian, trousers, flowerpot, sidewalk, shoe, short pants, polo shirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-37">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-37--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-37">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-38">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">38</p>
+            <p class="node-dt">2022/05/13 14:47:40 - 14:47:40</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: sidewalk, trousers, pavement, manhole, street.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-38">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-38--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-38">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-39">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">39</p>
+            <p class="node-dt">2022/05/13 14:47:41 - 14:47:41</p>
+            <p class="node-summary">Action: A woman Y walked around the<br>  Visual observation: trousers, sidewalk, shoe.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-39">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-39--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-39">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-40">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">40</p>
+            <p class="node-dt">2022/05/13 14:47:42 - 14:47:42</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: sidewalk, doormat, trousers, pavement, cistern, short pants, street, skirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-40">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-40--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-40">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-41">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">41</p>
+            <p class="node-dt">2022/05/13 14:47:43 - 14:47:43</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: sunhat, sidewalk, pavement, trousers, street, fedora, sombrero, road, tricycle, shoe.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-41">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-41--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-41">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-42">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">42</p>
+            <p class="node-dt">2022/05/13 14:47:44 - 14:47:44</p>
+            <p class="node-summary">Action: I walked on the pavement<br>  Visual observation: trousers, sidewalk, skirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-42">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-42--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-42">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-43">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">43</p>
+            <p class="node-dt">2022/05/13 14:47:45 - 14:47:45</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: shoe.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-43">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-43--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-43">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-44">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">44</p>
+            <p class="node-dt">2022/05/13 14:47:46 - 14:47:46</p>
+            <p class="node-summary">Action: I walked on the<br>  Visual observation: shoe.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-44">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-44--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-44">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-45">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">45</p>
+            <p class="node-dt">2022/05/13 14:47:47 - 14:47:47</p>
+            <p class="node-summary">Action: I walked on the<br>  Visual observation: shoe.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-45">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-45--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-45">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-46">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">46</p>
+            <p class="node-dt">2022/05/13 14:47:48 - 14:47:48</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: trousers, flowerpot.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-46">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-46--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-46">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-47">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">47</p>
+            <p class="node-dt">2022/05/13 14:47:49 - 14:47:49</p>
+            <p class="node-summary">Action: I walked around the<br>  Visual observation: trousers, sidewalk, flowerpot.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-47">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-47--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-47">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-48">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">48</p>
+            <p class="node-dt">2022/05/13 14:47:50 - 14:47:50</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: trousers, skirt, pedestrian, short pants, shirt, flowerpot, fedora, sidewalk.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-48">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-48--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-48">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-49">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">49</p>
+            <p class="node-dt">2022/05/13 14:47:51 - 14:47:51</p>
+            <p class="node-summary">Action: I looked around.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-49">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-49--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-49">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-50">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">50</p>
+            <p class="node-dt">2022/05/13 14:47:52 - 14:47:52</p>
+            <p class="node-summary">Action: I looked around<br>  Visual observation: trousers.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-50">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-50--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-50">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-51">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">51</p>
+            <p class="node-dt">2022/05/13 14:47:53 - 14:47:53</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: trousers, sidewalk, handcart.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-51">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-51--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-51">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-52">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">52</p>
+            <p class="node-dt">2022/05/13 14:47:54 - 14:47:54</p>
+            <p class="node-summary">Action: I walked on the<br>  Visual observation: trousers, skirt, sidewalk, flowerpot, shoe.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-52">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-52--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-52">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-53">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">53</p>
+            <p class="node-dt">2022/05/13 14:47:55 - 14:47:55</p>
+            <p class="node-summary">Action: I walked around<br>  Visual observation: trousers, skirt, sidewalk, pavement.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-53">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-53--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-53">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-54">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">54</p>
+            <p class="node-dt">2022/05/13 14:47:56 - 14:47:56</p>
+            <p class="node-summary">Action: I walked around the<br>  Visual observation: skirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-54">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-54--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-54">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-55">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">55</p>
+            <p class="node-dt">2022/05/13 14:47:57 - 14:47:57</p>
+            <p class="node-summary">Action: I looked at man<br>  Visual observation: flowerpot.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-55">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-55--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-55">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-56">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">56</p>
+            <p class="node-dt">2022/05/13 14:47:58 - 14:47:58</p>
+            <p class="node-summary">Action: I walked on the<br>  Visual observation: flowerpot, trousers, pedestrian, sidewalk, pavement, bib.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-56">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-56--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-56">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-57">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">57</p>
+            <p class="node-dt">2022/05/13 14:47:59 - 14:47:59</p>
+            <p class="node-summary">Action: I walked on the<br>  Visual observation: trousers, short pants, skirt, street, sidewalk.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-57">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-57--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-57">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-58">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">58</p>
+            <p class="node-dt">2022/05/13 14:48:00 - 14:48:00</p>
+            <p class="node-summary">Action: I walked on the<br>  Visual observation: pavement, sidewalk, trousers, street, sunhat, short pants, skirt, pedestrian.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-58">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-58--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-58">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-0-59">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">59</p>
+            <p class="node-dt">2022/05/13 14:48:01 - 14:48:01</p>
+            <p class="node-summary">Action: I walked on the<br>  Visual observation: sunhat, trousers, sidewalk, sombrero, commute, pavement, doormat, shoe, skirt.</p>
+        </div><div class="child-container l4" id="child-container-0-0-2-0-59">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-59--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0-59">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2022/05/13 14:48:02 - 14:49:01</p>
+            <p class="node-summary">Goal: I was in the street, walked around and looked around.<br>  Visual observation: sombrero</p>
+        </div><div class="child-container l3" id="child-container-0-0-2-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-2">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">2</p>
+            <p class="node-dt">2022/05/13 14:49:02 - 14:50:01</p>
+            <p class="node-summary">Goal: I was outside, walked on the pavement and interacted with person X and Y<br>  Visual observation: shoe, flipper (footwear), sandal (type of shoe), handcart, tricycle, wheelchair</p>
+        </div><div class="child-container l3" id="child-container-0-0-2-2">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-2--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-2">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-0-2-3">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">3</p>
+            <p class="node-dt">2022/05/13 14:50:02 - 14:51:01</p>
+            <p class="node-summary">Goal: I was outside, walked on the pavement and interacted with person X, Y, and Z.<br>  Visual observation: person, trash can, handcart, sidewalk, cart, shoe, pavement</p>
+        </div><div class="child-container l3" id="child-container-0-0-2-3">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-3--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2-3">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0-2">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2022/05/13 14:51 - 15:02</p>
+            <p class="node-summary">I returned indoors, washed up, and talked with people in various rooms before going to a shop where I interacted with several women and observed transactions.</p>
+        </div><div class="child-container l1" id="child-container-0-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-2">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">2</p>
+            <p class="node-dt">2022/05/13 15:02 - 15:39</p>
+            <p class="node-summary">I visited a house and a museum, interacting with people and observing art and displays.</p>
+        </div><div class="child-container l1" id="child-container-0-2">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-2--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-2">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-3">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">3</p>
+            <p class="node-dt">2022/05/13 15:39 - 17:06</p>
+            <p class="node-summary">I alternated between spending time inside the house and being outside on the street, interacting with people and using my phone. I also visited shops, including a supermarket.</p>
+        </div><div class="child-container l1" id="child-container-0-3">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-4">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">4</p>
+            <p class="node-dt">2022/05/13 17:06 - 17:45</p>
+            <p class="node-summary">I focused on interacting with people inside the house, using my phone, and occasionally stepping outside.</p>
+        </div><div class="child-container l1" id="child-container-0-4">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-4--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-4">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-5">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">5</p>
+            <p class="node-dt">2022/05/13 17:45 - 18:29</p>
+            <p class="node-summary">I spent time both inside the house and in the supermarket, interacting with people and observing my surroundings, while also visiting shops.</p>
+        </div><div class="child-container l1" id="child-container-0-5">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-5--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-5">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            
+        <div class="node " id="node-0-6">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">6</p>
+            <p class="node-dt">2022/05/13 18:29 - 19:10</p>
+            <p class="node-summary">I concluded my activities by interacting with people at home and on the street, using my phone, and enjoying some ice cream and food.</p>
+        </div><div class="child-container l1" id="child-container-0-6">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-6--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-6">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+    </div>
+</div>
+
+
+<script type="text/javascript">
+    
+    var step = 0;
+    const numSteps = 17;
+    function applyStep() {
+      $(".node").addClass("collapsed");
+      $(".child-container").addClass("collapsed");
+      $(".node-children-indicator").addClass("collapsed").removeClass("shown");
+      $(".message").addClass("collapsed");
+      $("#node-0, #child-container-0").removeClass("collapsed");
+        
+      if (step == 0) {$("#child-indicator-after-node-0-6").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed")}
+if (step == 1) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-6").removeClass("collapsed");$("#child-container-0-6").removeClass("collapsed");$("#child-indicator-after-node-0-0-2").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed")}
+if (step == 2) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#child-indicator-after-node-0-0-2").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed")}
+if (step == 3) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-1").removeClass("collapsed");$("#child-container-0-0-1").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#child-indicator-after-node-0-0-1-3").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-3").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed")}
+if (step == 4) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#child-indicator-after-node-0-0-2").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed")}
+if (step == 5) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-1").removeClass("collapsed");$("#child-container-0-0-1").removeClass("collapsed");$("#node-0-0-1-0").removeClass("collapsed");$("#child-container-0-0-1-0").removeClass("collapsed");$("#node-0-0-1-1").removeClass("collapsed");$("#child-container-0-0-1-1").removeClass("collapsed");$("#node-0-0-1-2").removeClass("collapsed");$("#child-container-0-0-1-2").removeClass("collapsed");$("#node-0-0-1-3").removeClass("collapsed");$("#child-container-0-0-1-3").removeClass("collapsed");$("#child-indicator-after-node-0-0-1-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-1-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-1-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-1-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed")}
+if (step == 6) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-2").removeClass("collapsed");$("#child-container-0-0-2-2").removeClass("collapsed");$("#node-0-0-2-3").removeClass("collapsed");$("#child-container-0-0-2-3").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-59").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed")}
+if (step == 7) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-59").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed")}
+if (step == 8) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-1").removeClass("collapsed");$("#child-container-0-0-2-0-1").removeClass("collapsed");$("#node-0-0-2-0-2").removeClass("collapsed");$("#child-container-0-0-2-0-2").removeClass("collapsed");$("#node-0-0-2-0-3").removeClass("collapsed");$("#child-container-0-0-2-0-3").removeClass("collapsed");$("#node-0-0-2-0-4").removeClass("collapsed");$("#child-container-0-0-2-0-4").removeClass("collapsed");$("#node-0-0-2-0-5").removeClass("collapsed");$("#child-container-0-0-2-0-5").removeClass("collapsed");$("#node-0-0-2-0-6").removeClass("collapsed");$("#child-container-0-0-2-0-6").removeClass("collapsed");$("#node-0-0-2-0-7").removeClass("collapsed");$("#child-container-0-0-2-0-7").removeClass("collapsed");$("#node-0-0-2-0-8").removeClass("collapsed");$("#child-container-0-0-2-0-8").removeClass("collapsed");$("#node-0-0-2-0-9").removeClass("collapsed");$("#child-container-0-0-2-0-9").removeClass("collapsed");$("#node-0-0-2-0-10").removeClass("collapsed");$("#child-container-0-0-2-0-10").removeClass("collapsed");$("#node-0-0-2-0-11").removeClass("collapsed");$("#child-container-0-0-2-0-11").removeClass("collapsed");$("#node-0-0-2-0-12").removeClass("collapsed");$("#child-container-0-0-2-0-12").removeClass("collapsed");$("#node-0-0-2-0-13").removeClass("collapsed");$("#child-container-0-0-2-0-13").removeClass("collapsed");$("#node-0-0-2-0-14").removeClass("collapsed");$("#child-container-0-0-2-0-14").removeClass("collapsed");$("#node-0-0-2-0-15").removeClass("collapsed");$("#child-container-0-0-2-0-15").removeClass("collapsed");$("#node-0-0-2-0-16").removeClass("collapsed");$("#child-container-0-0-2-0-16").removeClass("collapsed");$("#node-0-0-2-0-17").removeClass("collapsed");$("#child-container-0-0-2-0-17").removeClass("collapsed");$("#node-0-0-2-0-18").removeClass("collapsed");$("#child-container-0-0-2-0-18").removeClass("collapsed");$("#node-0-0-2-0-19").removeClass("collapsed");$("#child-container-0-0-2-0-19").removeClass("collapsed");$("#node-0-0-2-0-20").removeClass("collapsed");$("#child-container-0-0-2-0-20").removeClass("collapsed");$("#node-0-0-2-0-21").removeClass("collapsed");$("#child-container-0-0-2-0-21").removeClass("collapsed");$("#node-0-0-2-0-22").removeClass("collapsed");$("#child-container-0-0-2-0-22").removeClass("collapsed");$("#node-0-0-2-0-23").removeClass("collapsed");$("#child-container-0-0-2-0-23").removeClass("collapsed");$("#node-0-0-2-0-24").removeClass("collapsed");$("#child-container-0-0-2-0-24").removeClass("collapsed");$("#node-0-0-2-0-25").removeClass("collapsed");$("#child-container-0-0-2-0-25").removeClass("collapsed");$("#node-0-0-2-0-26").removeClass("collapsed");$("#child-container-0-0-2-0-26").removeClass("collapsed");$("#node-0-0-2-0-27").removeClass("collapsed");$("#child-container-0-0-2-0-27").removeClass("collapsed");$("#node-0-0-2-0-28").removeClass("collapsed");$("#child-container-0-0-2-0-28").removeClass("collapsed");$("#node-0-0-2-0-29").removeClass("collapsed");$("#child-container-0-0-2-0-29").removeClass("collapsed");$("#node-0-0-2-0-30").removeClass("collapsed");$("#child-container-0-0-2-0-30").removeClass("collapsed");$("#node-0-0-2-0-31").removeClass("collapsed");$("#child-container-0-0-2-0-31").removeClass("collapsed");$("#node-0-0-2-0-32").removeClass("collapsed");$("#child-container-0-0-2-0-32").removeClass("collapsed");$("#node-0-0-2-0-33").removeClass("collapsed");$("#child-container-0-0-2-0-33").removeClass("collapsed");$("#node-0-0-2-0-34").removeClass("collapsed");$("#child-container-0-0-2-0-34").removeClass("collapsed");$("#node-0-0-2-0-35").removeClass("collapsed");$("#child-container-0-0-2-0-35").removeClass("collapsed");$("#node-0-0-2-0-36").removeClass("collapsed");$("#child-container-0-0-2-0-36").removeClass("collapsed");$("#node-0-0-2-0-37").removeClass("collapsed");$("#child-container-0-0-2-0-37").removeClass("collapsed");$("#node-0-0-2-0-38").removeClass("collapsed");$("#child-container-0-0-2-0-38").removeClass("collapsed");$("#node-0-0-2-0-39").removeClass("collapsed");$("#child-container-0-0-2-0-39").removeClass("collapsed");$("#node-0-0-2-0-40").removeClass("collapsed");$("#child-container-0-0-2-0-40").removeClass("collapsed");$("#node-0-0-2-0-41").removeClass("collapsed");$("#child-container-0-0-2-0-41").removeClass("collapsed");$("#node-0-0-2-0-42").removeClass("collapsed");$("#child-container-0-0-2-0-42").removeClass("collapsed");$("#node-0-0-2-0-43").removeClass("collapsed");$("#child-container-0-0-2-0-43").removeClass("collapsed");$("#node-0-0-2-0-44").removeClass("collapsed");$("#child-container-0-0-2-0-44").removeClass("collapsed");$("#node-0-0-2-0-45").removeClass("collapsed");$("#child-container-0-0-2-0-45").removeClass("collapsed");$("#node-0-0-2-0-46").removeClass("collapsed");$("#child-container-0-0-2-0-46").removeClass("collapsed");$("#node-0-0-2-0-47").removeClass("collapsed");$("#child-container-0-0-2-0-47").removeClass("collapsed");$("#node-0-0-2-0-48").removeClass("collapsed");$("#child-container-0-0-2-0-48").removeClass("collapsed");$("#node-0-0-2-0-49").removeClass("collapsed");$("#child-container-0-0-2-0-49").removeClass("collapsed");$("#node-0-0-2-0-50").removeClass("collapsed");$("#child-container-0-0-2-0-50").removeClass("collapsed");$("#node-0-0-2-0-51").removeClass("collapsed");$("#child-container-0-0-2-0-51").removeClass("collapsed");$("#node-0-0-2-0-52").removeClass("collapsed");$("#child-container-0-0-2-0-52").removeClass("collapsed");$("#node-0-0-2-0-53").removeClass("collapsed");$("#child-container-0-0-2-0-53").removeClass("collapsed");$("#node-0-0-2-0-54").removeClass("collapsed");$("#child-container-0-0-2-0-54").removeClass("collapsed");$("#node-0-0-2-0-55").removeClass("collapsed");$("#child-container-0-0-2-0-55").removeClass("collapsed");$("#node-0-0-2-0-56").removeClass("collapsed");$("#child-container-0-0-2-0-56").removeClass("collapsed");$("#node-0-0-2-0-57").removeClass("collapsed");$("#child-container-0-0-2-0-57").removeClass("collapsed");$("#node-0-0-2-0-58").removeClass("collapsed");$("#child-container-0-0-2-0-58").removeClass("collapsed");$("#node-0-0-2-0-59").removeClass("collapsed");$("#child-container-0-0-2-0-59").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-8--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-9--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-10--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-11--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-12--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-13--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-14--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-15--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-16--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-17--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-18--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-19--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-20--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-21--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-22--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-23--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-24--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-25--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-26--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-27--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-28--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-29--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-30--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-31--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-32--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-33--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-34--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-35--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-36--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-37--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-38--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-39--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-40--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-41--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-42--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-43--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-44--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-45--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-46--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-47--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-48--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-49--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-50--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-51--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-52--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-53--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-54--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-55--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-56--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-57--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-58--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-59--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed")}
+if (step == 9) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed")}
+if (step == 10) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed");$("#msg-11").removeClass("collapsed");$("#msg-12").removeClass("collapsed")}
+if (step == 11) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed");$("#msg-11").removeClass("collapsed");$("#msg-12").removeClass("collapsed");$("#msg-13").removeClass("collapsed");$("#msg-14").removeClass("collapsed")}
+if (step == 12) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-2").removeClass("collapsed");$("#child-container-0-2").removeClass("collapsed");$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-4").removeClass("collapsed");$("#child-container-0-4").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-6").removeClass("collapsed");$("#child-container-0-6").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-6--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed");$("#msg-11").removeClass("collapsed");$("#msg-12").removeClass("collapsed");$("#msg-13").removeClass("collapsed");$("#msg-14").removeClass("collapsed");$("#msg-15").removeClass("collapsed")}
+if (step == 13) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-2").removeClass("collapsed");$("#child-container-0-2").removeClass("collapsed");$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-4").removeClass("collapsed");$("#child-container-0-4").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-6").removeClass("collapsed");$("#child-container-0-6").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-6--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed");$("#msg-11").removeClass("collapsed");$("#msg-12").removeClass("collapsed");$("#msg-13").removeClass("collapsed");$("#msg-14").removeClass("collapsed");$("#msg-15").removeClass("collapsed");$("#msg-16").removeClass("collapsed");$("#msg-17").removeClass("collapsed")}
+if (step == 14) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-2").removeClass("collapsed");$("#child-container-0-2").removeClass("collapsed");$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-4").removeClass("collapsed");$("#child-container-0-4").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-6").removeClass("collapsed");$("#child-container-0-6").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-6--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed");$("#msg-11").removeClass("collapsed");$("#msg-12").removeClass("collapsed");$("#msg-13").removeClass("collapsed");$("#msg-14").removeClass("collapsed");$("#msg-15").removeClass("collapsed");$("#msg-16").removeClass("collapsed");$("#msg-17").removeClass("collapsed");$("#msg-18").removeClass("collapsed");$("#msg-19").removeClass("collapsed")}
+if (step == 15) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-2").removeClass("collapsed");$("#child-container-0-2").removeClass("collapsed");$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-4").removeClass("collapsed");$("#child-container-0-4").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-6").removeClass("collapsed");$("#child-container-0-6").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-6--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed");$("#msg-11").removeClass("collapsed");$("#msg-12").removeClass("collapsed");$("#msg-13").removeClass("collapsed");$("#msg-14").removeClass("collapsed");$("#msg-15").removeClass("collapsed");$("#msg-16").removeClass("collapsed");$("#msg-17").removeClass("collapsed");$("#msg-18").removeClass("collapsed");$("#msg-19").removeClass("collapsed");$("#msg-20").removeClass("collapsed")}
+if (step == 16) {$("#node-0-0").removeClass("collapsed");$("#child-container-0-0").removeClass("collapsed");$("#node-0-1").removeClass("collapsed");$("#child-container-0-1").removeClass("collapsed");$("#node-0-2").removeClass("collapsed");$("#child-container-0-2").removeClass("collapsed");$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-4").removeClass("collapsed");$("#child-container-0-4").removeClass("collapsed");$("#node-0-5").removeClass("collapsed");$("#child-container-0-5").removeClass("collapsed");$("#node-0-6").removeClass("collapsed");$("#child-container-0-6").removeClass("collapsed");$("#node-0-0-2").removeClass("collapsed");$("#child-container-0-0-2").removeClass("collapsed");$("#node-0-0-2-0").removeClass("collapsed");$("#child-container-0-0-2-0").removeClass("collapsed");$("#node-0-0-2-1").removeClass("collapsed");$("#child-container-0-0-2-1").removeClass("collapsed");$("#node-0-0-2-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0").removeClass("collapsed");$("#node-0-0-2-0-0-0").removeClass("collapsed");$("#child-container-0-0-2-0-0-0").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-0-0").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0-2-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-6--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed");$("#msg-7").removeClass("collapsed");$("#msg-8").removeClass("collapsed");$("#msg-9").removeClass("collapsed");$("#msg-10").removeClass("collapsed");$("#msg-11").removeClass("collapsed");$("#msg-12").removeClass("collapsed");$("#msg-13").removeClass("collapsed");$("#msg-14").removeClass("collapsed");$("#msg-15").removeClass("collapsed");$("#msg-16").removeClass("collapsed");$("#msg-17").removeClass("collapsed");$("#msg-18").removeClass("collapsed");$("#msg-19").removeClass("collapsed");$("#msg-20").removeClass("collapsed");$("#msg-21").removeClass("collapsed")}
+
+    }
+
+    $("#button-prev").on("click", () => {
+        if (step > 0) step -= 1;
+        applyStep();
+    })
+    $("#button-next").on("click", () => {
+        if (step + 1 < numSteps) step += 1;
+        applyStep();
+    })
+    function animateStep() {
+        $('#button-bar').css({'display': 'none'})
+        setTimeout(() => {
+            if (step + 1 < numSteps) {
+                step += 1;
+                applyStep();
+                /*var leftCol = $('.column-left').get(0);
+                leftCol.scrollTo({top: leftCol.scrollHeight, behavior: 'smooth'});*/
+                animateStep();
+            } else {
+                $('#button-bar').css({'display': 'unset'})
+            }
+        }, 2000)
+    }
+    $("#button-animate").on("click", () => {
+        step = 0;
+        animateStep();
+    })
+    applyStep();
+    
+    function keyPress(e) {
+        if(e.key === 'a') {
+            $('#button-animate').click();
+        }
+    }
+    document.addEventListener("keydown", keyPress, false);
+
+    
+</script>
+<script type="text/javascript">
+    function scaleContent() {
+        var container = $('.container');
+        var content = $('.column-right-scaling');
+        // Get container and content dimensions
+        var containerWidth = container.width();
+        var containerHeight = container.height();
+        var contentWidth = content[0].scrollWidth;
+        var contentHeight = content[0].scrollHeight;
+        // Calculate scale factors
+        var scaleX = containerWidth / contentWidth;
+        var scaleY = containerHeight / contentHeight;
+        // Use the smaller scale factor to ensure the content fits both dimensions
+        var scale = Math.min(scaleX, scaleY, 1);
+        // Apply the scale transformation
+        content.css({
+            'transform': 'scale(' + scale + ')'
+        });
+    }
+
+    // Also observe changes in the content's size via the ResizeObserver (for better handling)
+    var resizeObserver = new ResizeObserver(function (entries) {
+        for (let entry of entries) {
+            if (entry.target.matches('.column-right-scaling')) {
+                scaleContent();
+            }
+        }
+    });
+
+    function toggleScalingOrScrolling() {
+        let scale = $('#scale-or-scroll-checkbox').get(0).checked
+        if (scale) {
+            $('#tree-column').addClass('column-right-scaling').removeClass('column-right-scrolling');
+            resizeObserver.observe($('.column-right-scaling').get(0))
+        } else {
+            resizeObserver.disconnect()
+            $('.column-right-scaling').css('transform', 'none');
+            $('#tree-column').addClass('column-right-scrolling').removeClass('column-right-scaling');
+        }
+
+    }
+</script>
+
+</body>
+</html>

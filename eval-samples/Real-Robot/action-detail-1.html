@@ -1,0 +1,1116 @@
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <title>Hierarchical EMV Demo</title>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.js"></script>
+
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+
+
+    <style>
+        body {
+            background: white;
+            font-family: Helvetica, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100% - 34px); /* Full height - top buttons */
+            overflow: hidden; /* Hide overflow */
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .column {
+            padding: 20px;
+            box-sizing: border-box;
+            overflow: auto;
+        }
+
+        .column-left {
+            width: 40%;
+            overflow: auto;
+        }
+
+        .column-right-scrolling {
+            width: 60%;
+            overflow: auto;
+        }
+
+        .column-right-scaling {
+            overflow: unset;
+            position: relative; /* to allow scaling */
+            top: 0;
+            left: 0;
+            transform-origin: top center; /* Scale from top-left */
+            width: 60%;
+            height: fit-content;
+        }
+
+        @media (max-width: 850px) {
+            .container {
+                flex-direction: column;
+                height: unset;
+            }
+
+            .column-left, .column-right-scaling, .column-right-scrolling {
+                width: 100%;
+                overflow: unset;
+            }
+
+            .hidden-sm {
+                display: none;
+            }
+        }
+
+        .node {
+            display: flex;
+            flex-direction: row;
+            align-items: baseline;
+            overflow: hidden;
+            transition: all 0.5s;
+            max-height: 50px;
+            opacity: 1;
+        }
+
+        .child-container {
+            display: flex;
+            flex-direction: column;
+            border: 0 solid currentColor;
+            border-left-width: 1px;
+            margin-left: 20px;
+        }
+
+        .child-container.l0 {
+            color: black;
+        }
+
+        .child-container.l1 {
+            color: rgb(70, 70, 70);
+        }
+
+        .child-container.l2 {
+            color: rgb(120, 120, 120);
+        }
+
+        .child-container.l3 {
+            color: rgb(160, 160, 160);
+        }
+
+        .child-container.l4 {
+            color: rgb(200, 200, 200);
+        }
+
+        .child-container:not(.collapsed)::after {
+            content: '';
+            height: 22px;
+            margin-top: -22px;
+            border: solid white;
+            border-width: 0 0 0 4px;
+            position: relative;
+            left: -2px;
+        }
+
+        .node-children-indicator {
+            overflow: hidden;
+            box-sizing: border-box;
+            transition: all 0.5s;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            max-height: 50px;
+            opacity: 1;
+        }
+
+        .collapsed {
+            max-height: 0 !important;
+            opacity: 0 !important;
+        }
+
+
+        .node > * {
+            padding: 0 5px;
+        }
+
+        .node-children-indicator > * {
+            padding: 15px;
+        }
+
+        .node-icon {
+            flex-shrink: 0;
+            width: 30px;
+            padding: 0;
+            height: 0;
+            align-self: center;
+            border: solid;
+            border-width: 1px 0 0 0;
+            box-sizing: content-box;
+        }
+
+        .node-icon-2 {
+            flex-shrink: 0;
+            position: relative;
+            top: 20px;
+            right: 10px;
+            padding: 0;
+            height: 25px;
+            border: solid;
+            filter: brightness(120%);
+            border-width: 0 1px 0 0;
+        }
+
+        .l4 .node-icon-2 {
+            filter: none;
+        }
+
+        .leaf > .node-icon-2 {
+            border: none;
+        }
+
+        .node-idx, .node-dt {
+            color: rgb(100, 100, 100);
+        }
+
+        .node-idx::after {
+            content: ':';
+        }
+
+        .node-summary {
+            color: black;
+        }
+
+        button {
+            background: #0084ff;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 14px;
+            font-size: 15px;
+            color: #fff;
+        }
+
+    </style>
+
+    <style>
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 85%;
+            clear: both;
+            position: relative;
+            max-height: 150px;
+            opacity: 1;
+            transition: all 0.5s;
+            font-size: 15px;
+            font-family: monospace;
+            overflow: clip;
+        }
+
+        .message.from-human {
+            background-color: #eceae1;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.from-bot {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            margin-right: auto;
+            text-align: left;
+        }
+
+        .message.initial, .message.answer {
+            text-align: center;
+            margin-right: auto;
+            margin-left: auto;
+            font-weight: bold;
+            font-family: Helvetica, sans-serif;
+        }
+
+        .message.initial {
+            background-color: lightcyan;
+        }
+
+        .message.answer {
+            background-color: #d5ffd5;
+        }
+    </style>
+
+
+</head>
+<body>
+
+<div id="button-bar">
+    <button id="button-animate">
+        Animate
+    </button>
+    <button id="button-prev">
+        Previous
+    </button>
+    <button id="button-next">
+        Next
+    </button>
+
+    <label class="hidden-sm" style="margin-left: 30px">
+        <input type="checkbox" id="scale-or-scroll-checkbox" onchange="toggleScalingOrScrolling()">
+        Scale tree to fit
+    </label>
+</div>
+
+
+<div class="container">
+    <div class="column column-left">
+        <div class="chat-container">
+            <div class="message initial" id="msg-0">Which object did you try to bring today at noon?</div>
+<div class="message from-bot" id="msg-1">history.expand(now().date())</div>
+<div class="message from-bot" id="msg-2">history[3].expand()</div>
+<div class="message from-bot" id="msg-3">history[3][1].expand()</div>
+<div class="message from-bot" id="msg-4">history[3][1][0].expand()</div>
+<div class="message from-bot" id="msg-5">answer(reasoning="At noon today, I attempted to bring 'soy milk' from the countertop to a human, but the attempt failed.", answer="soy milk")</div>
+<div class="message answer" id="msg-6">soy milk</div>
+
+        </div>
+    </div>
+
+    <div class="column column-right-scrolling" id="tree-column">
+
+        <div class="node " id="node-0">
+            <i class="node-icon"style="margin-left: 17px; height: 2px; width: 2px; margin-right:7px; border-width: 2px; border-radius: 2px; background-color: gray"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2024/06/26 - 2024/08/27</p>
+            <p class="node-summary">Over the past few months, I have engaged in a variety of activities, including object identification and handovers, navigation, introductions, and interacting with people through gestures and speech, while encountering challenges like failed object retrievals and dishwasher loading attempts.</p>
+        </div><div class="child-container l0" id="child-container-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">3</p>
+            <p class="node-dt">2024/08/27 11:24 - 14:58</p>
+            <p class="node-summary">On August 27, I attempted grasping and moving objects, performed look commands, navigated, and interacted with humans through gestures and speech. I also encountered failed attempts to bring objects and tried to load the dishwasher.</p>
+        </div><div class="child-container l1" id="child-container-0-3">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2024/08/27 11:24 - 11:36</p>
+            <p class="node-summary">I tried grasping and moving objects, and had interactions involving introductions and object handovers.</p>
+        </div><div class="child-container l2" id="child-container-0-3-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2024/08/27 11:51 - 14:58</p>
+            <p class="node-summary">Later on August 27th, I performed various look commands, navigated, engaged in task responses, including failed attempts to bring an object, and interacted with humans through gestures, navigation, and speech while attempting to load the dishwasher.</p>
+        </div><div class="child-container l2" id="child-container-0-3-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2024/08/27 11:51 - 14:12</p>
+            <p class="node-summary">I performed various look commands, navigated, and engaged in general task responses, including failed attempts to bring an object.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-0">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">0</p>
+            <p class="node-dt">2024/08/27 11:51:42 - 11:53:07</p>
+            <p class="node-summary">Goal: LookAhead</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-0">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-0--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2024/08/27 11:53:18 - 11:53:18</p>
+            <p class="node-summary">Goal: LookDown</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-2">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">2</p>
+            <p class="node-dt">2024/08/27 11:53:48 - 11:53:48</p>
+            <p class="node-summary">Goal: CloseHand(hand=0)</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-2">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-2--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-2">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-3">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">3</p>
+            <p class="node-dt">2024/08/27 11:53:52 - 11:53:53</p>
+            <p class="node-summary">Goal: OpenHand(hand=0)</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-3">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-3--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-3">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-4">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">4</p>
+            <p class="node-dt">2024/08/27 11:53:55 - 11:54:40</p>
+            <p class="node-summary">Goal: LookAhead</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-4">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-4--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-4">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-5">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">5</p>
+            <p class="node-dt">2024/08/27 11:54:43 - 11:54:43</p>
+            <p class="node-summary">Goal: LookDown</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-5">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-5--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-5">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-6">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">6</p>
+            <p class="node-dt">2024/08/27 11:54:46 - 11:54:46</p>
+            <p class="node-summary">Goal: LookAhead</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-6">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-6--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-6">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-7">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">7</p>
+            <p class="node-dt">2024/08/27 11:57:37 - 11:58:02</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home<br>  Speech:<br>  2024-08-27 11:57:48.404081: Hi, how are you?<br>  2024-08-27 11:58:01.405983: Introduce yourself, please</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-7">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-7--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-7">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-8">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">8</p>
+            <p class="node-dt">2024/08/27 11:58:03 - 11:59:43</p>
+            <p class="node-summary">Goal: Introduction<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-8">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-8--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-8">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-9">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">9</p>
+            <p class="node-dt">2024/08/27 11:59:43 - 12:01:48</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home<br>  Speech:<br>  2024-08-27 11:59:55.922436: Bring me the soy milk<br>  2024-08-27 12:01:46.938061: No, bring me the soy milk from the counter</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-9">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-9--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-9">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-10">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">10</p>
+            <p class="node-dt">2024/08/27 12:01:49 - 12:01:59</p>
+            <p class="node-summary">Goal: BringNamedObjectFromNamedLocationToHuman(object=soy milk, location=countertop, handoverLocation=home) &lt;Failed&gt;<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-10">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-10--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-10">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-11">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">11</p>
+            <p class="node-dt">2024/08/27 12:02:00 - 12:02:41</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop<br>  Speech:<br>  2024-08-27 12:02:40.945513: That didn't work. Please go back to home pose</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-11">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-11--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-11">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-12">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">12</p>
+            <p class="node-dt">2024/08/27 12:02:42 - 12:02:43</p>
+            <p class="node-summary">Goal: HomePose<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-12">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-12--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-12">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-13">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">13</p>
+            <p class="node-dt">2024/08/27 12:02:43 - 12:02:50</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop<br>  Speech:<br>  2024-08-27 12:02:49.946756: Go home</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-13">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-13--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-13">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-14">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">14</p>
+            <p class="node-dt">2024/08/27 12:02:50 - 12:02:51</p>
+            <p class="node-summary">Goal: HomePose<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-14">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-14--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-14">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-15">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">15</p>
+            <p class="node-dt">2024/08/27 12:02:51 - 12:02:51</p>
+            <p class="node-summary">Goal: LookAhead<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-15">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-15--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-15">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-16">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">16</p>
+            <p class="node-dt">2024/08/27 12:02:51 - 12:03:00</p>
+            <p class="node-summary">Goal: NavigateToLocation(location=R007/home, velocityLimitLinear=300.0, velocityLimitAngular=0.5)<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-16">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-16--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-16">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-17">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">17</p>
+            <p class="node-dt">2024/08/27 12:03:00 - 12:03:15</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home<br>  Speech:<br>  2024-08-27 12:03:14.450192: Now please try again to bring the milk from the counter</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-17">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-17--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-17">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-18">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">18</p>
+            <p class="node-dt">2024/08/27 12:03:16 - 12:03:27</p>
+            <p class="node-summary">Goal: BringNamedObjectFromNamedLocationToHuman(object=soy milk, location=countertop, handoverLocation=home) &lt;Failed&gt;<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-18">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-18--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-18">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-19">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">19</p>
+            <p class="node-dt">2024/08/27 12:03 - 12:08</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, soy-milk, Robot, countertop<br>  soy-milk is on mobile-kitchen-counter<br>  Robot is inFrontOf countertop<br>  Speech:<br>  2024-08-27 12:04:23.459679: Tell me what is your favorite drink?<br>  2024-08-27 12:04:54.463914: Who is the chancellor of Germany?<br>  2024-08-27 12:07:43.987144: Tell me what you can do<br>  2024-08-27 12:08:03.489835: Now try to bring me the drink again</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-19">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-19--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-19">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-20">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">20</p>
+            <p class="node-dt">2024/08/27 12:08:04 - 12:08:06</p>
+            <p class="node-summary">Goal: BringNamedObjectFromNamedLocationToHuman(object=water, location=countertop, handoverLocation=home) &lt;Failed&gt;<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, soy-milk, Robot, countertop<br>  soy-milk is on mobile-kitchen-counter<br>  Robot is inFrontOf countertop</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-20">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-20--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-20">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-21">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">21</p>
+            <p class="node-dt">2024/08/27 12:08:06 - 12:08:15</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, soy-milk, Robot, countertop<br>  soy-milk is on mobile-kitchen-counter<br>  Robot is inFrontOf countertop<br>  Speech:<br>  2024-08-27 12:08:14.991444: I'm talking about the milk</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-21">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-21--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-21">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-22">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">22</p>
+            <p class="node-dt">2024/08/27 12:08:16 - 12:08:52</p>
+            <p class="node-summary">Goal: BringNamedObjectFromNamedLocationToHuman(object=soy milk, location=countertop, handoverLocation=home) &lt;Failed&gt;<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, soy-milk, Robot, home<br>  soy-milk is on mobile-kitchen-counter<br>  Robot is at home</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-22">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-22--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-22">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-23">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">23</p>
+            <p class="node-dt">2024/08/27 12:08:53 - 12:09:45</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home<br>  Speech:<br>  2024-08-27 12:09:07.502448: Please hand it over to me<br>  2024-08-27 12:09:45.507717: Now try again</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-23">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-23--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-23">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-24">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">24</p>
+            <p class="node-dt">2024/08/27 12:09:46 - 12:10:30</p>
+            <p class="node-summary">Goal: HandOverObjectToHuman(arm=1) &lt;Aborted&gt;<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home<br>  Speech:<br>  2024-08-27 12:10:15.011777: That did not work</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-24">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-24--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-24">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-25">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">25</p>
+            <p class="node-dt">2024/08/27 12:10:31 - 12:10:33</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-25">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-25--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-25">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-26">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">26</p>
+            <p class="node-dt">2024/08/27 12:10:34 - 12:10:41</p>
+            <p class="node-summary">Goal: HandOverObjectToHuman(arm=1) &lt;Aborted&gt;<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-26">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-26--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-26">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-27">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">27</p>
+            <p class="node-dt">2024/08/27 12:10:41 - 12:10:56</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home<br>  Speech:<br>  2024-08-27 12:10:47.516213: Thanks, that's it for today. Bye!</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-27">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-27--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-27">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-28">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">28</p>
+            <p class="node-dt">2024/08/27 12:19:12 - 12:20:43</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, home<br>  Robot is at home<br>  Speech:<br>  2024-08-27 12:19:33.088910: Receive this object from me<br>  2024-08-27 12:20:12.107961: Come on</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-28">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-28--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-28">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-29">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">29</p>
+            <p class="node-dt">2024/08/27 14:01:58 - 14:04:40</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-29">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-29--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-29">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-0-30">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">30</p>
+            <p class="node-dt">2024/08/27 14:12:00 - 14:12:22</p>
+            <p class="node-summary">Goal: None<br>  Visual observation: hund-table-120x80, talo-you-q-160x80, talo-you-q-160x80, talo-you-q-160x80, controltable, table, mobile-dishwasher, mobile-fridge, mobile-kitchen-counter, Robot, countertop<br>  Robot is inFrontOf countertop<br>  Speech:<br>  2024-08-27 14:12:08.072277: Hi, are you ready?<br>  2024-08-27 14:12:22.074210: Look ahead</p>
+        </div><div class="child-container l4" id="child-container-0-3-1-0-30">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-30--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0-30">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-0">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-1">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">1</p>
+            <p class="node-dt">2024/08/27 14:12 - 14:15</p>
+            <p class="node-summary">I moved around the environment, looked at various objects, and participated in interactions with humans.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-1">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-1--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-2">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">2</p>
+            <p class="node-dt">2024/08/27 14:15:27 - 14:17:35</p>
+            <p class="node-summary">I adjusted my position, interacted through gestures, and followed commands to open and close hands.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-2">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-2--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-2">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-3">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">3</p>
+            <p class="node-dt">2024/08/27 14:17:35 - 14:19:16</p>
+            <p class="node-summary">I continued with a series of hand movements and interactions, receiving instructions from a human.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-3">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-3--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-3">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-4">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">4</p>
+            <p class="node-dt">2024/08/27 14:19 - 14:34</p>
+            <p class="node-summary">I navigated to different locations, looked around, and returned to home pose.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-4">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-4--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-4">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-5">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">5</p>
+            <p class="node-dt">2024/08/27 14:34 - 14:41</p>
+            <p class="node-summary">I navigated, attempted to grasp and load objects, and responded to human commands.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-5">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-5--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-5">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-6">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">6</p>
+            <p class="node-dt">2024/08/27 14:41 - 14:54</p>
+            <p class="node-summary">I looked ahead, navigated, and attempted to load the dishwasher, interacting with various objects.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-6">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-6--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-6">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+
+        <div class="node " id="node-0-3-1-7">
+            <i class="node-icon"></i>
+            <i class="node-icon-2"></i>
+            <p class="node-idx">7</p>
+            <p class="node-dt">2024/08/27 14:54 - 14:58</p>
+            <p class="node-summary">I scanned my surroundings, attempted to grasp objects, moved relative to the environment, and engaged in speech interactions with humans.</p>
+        </div><div class="child-container l3" id="child-container-0-3-1-7">
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-7--1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1-7">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3-1">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+            <div class="node-children-indicator" id="child-indicator-after-node-0-3">
+                <i class="node-icon"></i>
+                <i class="fa-solid fa-ellipsis"></i>
+            </div>
+            </div>
+    </div>
+</div>
+
+
+<script type="text/javascript">
+
+    var step = 0;
+    const numSteps = 7;
+    function applyStep() {
+      $(".node").addClass("collapsed");
+      $(".child-container").addClass("collapsed");
+      $(".node-children-indicator").addClass("collapsed").removeClass("shown");
+      $(".message").addClass("collapsed");
+      $("#node-0, #child-container-0").removeClass("collapsed");
+
+      if (step == 0) {$("#child-indicator-after-node-0-3").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed")}
+if (step == 1) {$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#child-indicator-after-node-0-3-1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed")}
+if (step == 2) {$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-3-0").removeClass("collapsed");$("#child-container-0-3-0").removeClass("collapsed");$("#node-0-3-1").removeClass("collapsed");$("#child-container-0-3-1").removeClass("collapsed");$("#child-indicator-after-node-0-3-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-7").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed")}
+if (step == 3) {$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-3-0").removeClass("collapsed");$("#child-container-0-3-0").removeClass("collapsed");$("#node-0-3-1").removeClass("collapsed");$("#child-container-0-3-1").removeClass("collapsed");$("#child-indicator-after-node-0-3-0--1").addClass("shown").removeClass("collapsed");$("#node-0-3-1-0").removeClass("collapsed");$("#child-container-0-3-1-0").removeClass("collapsed");$("#node-0-3-1-1").removeClass("collapsed");$("#child-container-0-3-1-1").removeClass("collapsed");$("#node-0-3-1-2").removeClass("collapsed");$("#child-container-0-3-1-2").removeClass("collapsed");$("#node-0-3-1-3").removeClass("collapsed");$("#child-container-0-3-1-3").removeClass("collapsed");$("#node-0-3-1-4").removeClass("collapsed");$("#child-container-0-3-1-4").removeClass("collapsed");$("#node-0-3-1-5").removeClass("collapsed");$("#child-container-0-3-1-5").removeClass("collapsed");$("#node-0-3-1-6").removeClass("collapsed");$("#child-container-0-3-1-6").removeClass("collapsed");$("#node-0-3-1-7").removeClass("collapsed");$("#child-container-0-3-1-7").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-30").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed")}
+if (step == 4) {$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-3-0").removeClass("collapsed");$("#child-container-0-3-0").removeClass("collapsed");$("#node-0-3-1").removeClass("collapsed");$("#child-container-0-3-1").removeClass("collapsed");$("#child-indicator-after-node-0-3-0--1").addClass("shown").removeClass("collapsed");$("#node-0-3-1-0").removeClass("collapsed");$("#child-container-0-3-1-0").removeClass("collapsed");$("#node-0-3-1-1").removeClass("collapsed");$("#child-container-0-3-1-1").removeClass("collapsed");$("#node-0-3-1-2").removeClass("collapsed");$("#child-container-0-3-1-2").removeClass("collapsed");$("#node-0-3-1-3").removeClass("collapsed");$("#child-container-0-3-1-3").removeClass("collapsed");$("#node-0-3-1-4").removeClass("collapsed");$("#child-container-0-3-1-4").removeClass("collapsed");$("#node-0-3-1-5").removeClass("collapsed");$("#child-container-0-3-1-5").removeClass("collapsed");$("#node-0-3-1-6").removeClass("collapsed");$("#child-container-0-3-1-6").removeClass("collapsed");$("#node-0-3-1-7").removeClass("collapsed");$("#child-container-0-3-1-7").removeClass("collapsed");$("#node-0-3-1-0-0").removeClass("collapsed");$("#child-container-0-3-1-0-0").removeClass("collapsed");$("#node-0-3-1-0-1").removeClass("collapsed");$("#child-container-0-3-1-0-1").removeClass("collapsed");$("#node-0-3-1-0-2").removeClass("collapsed");$("#child-container-0-3-1-0-2").removeClass("collapsed");$("#node-0-3-1-0-3").removeClass("collapsed");$("#child-container-0-3-1-0-3").removeClass("collapsed");$("#node-0-3-1-0-4").removeClass("collapsed");$("#child-container-0-3-1-0-4").removeClass("collapsed");$("#node-0-3-1-0-5").removeClass("collapsed");$("#child-container-0-3-1-0-5").removeClass("collapsed");$("#node-0-3-1-0-6").removeClass("collapsed");$("#child-container-0-3-1-0-6").removeClass("collapsed");$("#node-0-3-1-0-7").removeClass("collapsed");$("#child-container-0-3-1-0-7").removeClass("collapsed");$("#node-0-3-1-0-8").removeClass("collapsed");$("#child-container-0-3-1-0-8").removeClass("collapsed");$("#node-0-3-1-0-9").removeClass("collapsed");$("#child-container-0-3-1-0-9").removeClass("collapsed");$("#node-0-3-1-0-10").removeClass("collapsed");$("#child-container-0-3-1-0-10").removeClass("collapsed");$("#node-0-3-1-0-11").removeClass("collapsed");$("#child-container-0-3-1-0-11").removeClass("collapsed");$("#node-0-3-1-0-12").removeClass("collapsed");$("#child-container-0-3-1-0-12").removeClass("collapsed");$("#node-0-3-1-0-13").removeClass("collapsed");$("#child-container-0-3-1-0-13").removeClass("collapsed");$("#node-0-3-1-0-14").removeClass("collapsed");$("#child-container-0-3-1-0-14").removeClass("collapsed");$("#node-0-3-1-0-15").removeClass("collapsed");$("#child-container-0-3-1-0-15").removeClass("collapsed");$("#node-0-3-1-0-16").removeClass("collapsed");$("#child-container-0-3-1-0-16").removeClass("collapsed");$("#node-0-3-1-0-17").removeClass("collapsed");$("#child-container-0-3-1-0-17").removeClass("collapsed");$("#node-0-3-1-0-18").removeClass("collapsed");$("#child-container-0-3-1-0-18").removeClass("collapsed");$("#node-0-3-1-0-19").removeClass("collapsed");$("#child-container-0-3-1-0-19").removeClass("collapsed");$("#node-0-3-1-0-20").removeClass("collapsed");$("#child-container-0-3-1-0-20").removeClass("collapsed");$("#node-0-3-1-0-21").removeClass("collapsed");$("#child-container-0-3-1-0-21").removeClass("collapsed");$("#node-0-3-1-0-22").removeClass("collapsed");$("#child-container-0-3-1-0-22").removeClass("collapsed");$("#node-0-3-1-0-23").removeClass("collapsed");$("#child-container-0-3-1-0-23").removeClass("collapsed");$("#node-0-3-1-0-24").removeClass("collapsed");$("#child-container-0-3-1-0-24").removeClass("collapsed");$("#node-0-3-1-0-25").removeClass("collapsed");$("#child-container-0-3-1-0-25").removeClass("collapsed");$("#node-0-3-1-0-26").removeClass("collapsed");$("#child-container-0-3-1-0-26").removeClass("collapsed");$("#node-0-3-1-0-27").removeClass("collapsed");$("#child-container-0-3-1-0-27").removeClass("collapsed");$("#node-0-3-1-0-28").removeClass("collapsed");$("#child-container-0-3-1-0-28").removeClass("collapsed");$("#node-0-3-1-0-29").removeClass("collapsed");$("#child-container-0-3-1-0-29").removeClass("collapsed");$("#node-0-3-1-0-30").removeClass("collapsed");$("#child-container-0-3-1-0-30").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-8--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-9--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-10--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-11--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-12--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-13--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-14--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-15--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-16--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-17--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-18--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-19--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-20--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-21--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-22--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-23--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-24--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-25--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-26--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-27--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-28--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-29--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-30--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed")}
+if (step == 5) {$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-3-0").removeClass("collapsed");$("#child-container-0-3-0").removeClass("collapsed");$("#node-0-3-1").removeClass("collapsed");$("#child-container-0-3-1").removeClass("collapsed");$("#child-indicator-after-node-0-3-0--1").addClass("shown").removeClass("collapsed");$("#node-0-3-1-0").removeClass("collapsed");$("#child-container-0-3-1-0").removeClass("collapsed");$("#node-0-3-1-1").removeClass("collapsed");$("#child-container-0-3-1-1").removeClass("collapsed");$("#node-0-3-1-2").removeClass("collapsed");$("#child-container-0-3-1-2").removeClass("collapsed");$("#node-0-3-1-3").removeClass("collapsed");$("#child-container-0-3-1-3").removeClass("collapsed");$("#node-0-3-1-4").removeClass("collapsed");$("#child-container-0-3-1-4").removeClass("collapsed");$("#node-0-3-1-5").removeClass("collapsed");$("#child-container-0-3-1-5").removeClass("collapsed");$("#node-0-3-1-6").removeClass("collapsed");$("#child-container-0-3-1-6").removeClass("collapsed");$("#node-0-3-1-7").removeClass("collapsed");$("#child-container-0-3-1-7").removeClass("collapsed");$("#node-0-3-1-0-0").removeClass("collapsed");$("#child-container-0-3-1-0-0").removeClass("collapsed");$("#node-0-3-1-0-1").removeClass("collapsed");$("#child-container-0-3-1-0-1").removeClass("collapsed");$("#node-0-3-1-0-2").removeClass("collapsed");$("#child-container-0-3-1-0-2").removeClass("collapsed");$("#node-0-3-1-0-3").removeClass("collapsed");$("#child-container-0-3-1-0-3").removeClass("collapsed");$("#node-0-3-1-0-4").removeClass("collapsed");$("#child-container-0-3-1-0-4").removeClass("collapsed");$("#node-0-3-1-0-5").removeClass("collapsed");$("#child-container-0-3-1-0-5").removeClass("collapsed");$("#node-0-3-1-0-6").removeClass("collapsed");$("#child-container-0-3-1-0-6").removeClass("collapsed");$("#node-0-3-1-0-7").removeClass("collapsed");$("#child-container-0-3-1-0-7").removeClass("collapsed");$("#node-0-3-1-0-8").removeClass("collapsed");$("#child-container-0-3-1-0-8").removeClass("collapsed");$("#node-0-3-1-0-9").removeClass("collapsed");$("#child-container-0-3-1-0-9").removeClass("collapsed");$("#node-0-3-1-0-10").removeClass("collapsed");$("#child-container-0-3-1-0-10").removeClass("collapsed");$("#node-0-3-1-0-11").removeClass("collapsed");$("#child-container-0-3-1-0-11").removeClass("collapsed");$("#node-0-3-1-0-12").removeClass("collapsed");$("#child-container-0-3-1-0-12").removeClass("collapsed");$("#node-0-3-1-0-13").removeClass("collapsed");$("#child-container-0-3-1-0-13").removeClass("collapsed");$("#node-0-3-1-0-14").removeClass("collapsed");$("#child-container-0-3-1-0-14").removeClass("collapsed");$("#node-0-3-1-0-15").removeClass("collapsed");$("#child-container-0-3-1-0-15").removeClass("collapsed");$("#node-0-3-1-0-16").removeClass("collapsed");$("#child-container-0-3-1-0-16").removeClass("collapsed");$("#node-0-3-1-0-17").removeClass("collapsed");$("#child-container-0-3-1-0-17").removeClass("collapsed");$("#node-0-3-1-0-18").removeClass("collapsed");$("#child-container-0-3-1-0-18").removeClass("collapsed");$("#node-0-3-1-0-19").removeClass("collapsed");$("#child-container-0-3-1-0-19").removeClass("collapsed");$("#node-0-3-1-0-20").removeClass("collapsed");$("#child-container-0-3-1-0-20").removeClass("collapsed");$("#node-0-3-1-0-21").removeClass("collapsed");$("#child-container-0-3-1-0-21").removeClass("collapsed");$("#node-0-3-1-0-22").removeClass("collapsed");$("#child-container-0-3-1-0-22").removeClass("collapsed");$("#node-0-3-1-0-23").removeClass("collapsed");$("#child-container-0-3-1-0-23").removeClass("collapsed");$("#node-0-3-1-0-24").removeClass("collapsed");$("#child-container-0-3-1-0-24").removeClass("collapsed");$("#node-0-3-1-0-25").removeClass("collapsed");$("#child-container-0-3-1-0-25").removeClass("collapsed");$("#node-0-3-1-0-26").removeClass("collapsed");$("#child-container-0-3-1-0-26").removeClass("collapsed");$("#node-0-3-1-0-27").removeClass("collapsed");$("#child-container-0-3-1-0-27").removeClass("collapsed");$("#node-0-3-1-0-28").removeClass("collapsed");$("#child-container-0-3-1-0-28").removeClass("collapsed");$("#node-0-3-1-0-29").removeClass("collapsed");$("#child-container-0-3-1-0-29").removeClass("collapsed");$("#node-0-3-1-0-30").removeClass("collapsed");$("#child-container-0-3-1-0-30").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-8--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-9--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-10--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-11--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-12--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-13--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-14--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-15--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-16--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-17--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-18--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-19--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-20--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-21--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-22--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-23--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-24--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-25--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-26--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-27--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-28--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-29--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-30--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed")}
+if (step == 6) {$("#node-0-3").removeClass("collapsed");$("#child-container-0-3").removeClass("collapsed");$("#node-0-3-0").removeClass("collapsed");$("#child-container-0-3-0").removeClass("collapsed");$("#node-0-3-1").removeClass("collapsed");$("#child-container-0-3-1").removeClass("collapsed");$("#child-indicator-after-node-0-3-0--1").addClass("shown").removeClass("collapsed");$("#node-0-3-1-0").removeClass("collapsed");$("#child-container-0-3-1-0").removeClass("collapsed");$("#node-0-3-1-1").removeClass("collapsed");$("#child-container-0-3-1-1").removeClass("collapsed");$("#node-0-3-1-2").removeClass("collapsed");$("#child-container-0-3-1-2").removeClass("collapsed");$("#node-0-3-1-3").removeClass("collapsed");$("#child-container-0-3-1-3").removeClass("collapsed");$("#node-0-3-1-4").removeClass("collapsed");$("#child-container-0-3-1-4").removeClass("collapsed");$("#node-0-3-1-5").removeClass("collapsed");$("#child-container-0-3-1-5").removeClass("collapsed");$("#node-0-3-1-6").removeClass("collapsed");$("#child-container-0-3-1-6").removeClass("collapsed");$("#node-0-3-1-7").removeClass("collapsed");$("#child-container-0-3-1-7").removeClass("collapsed");$("#node-0-3-1-0-0").removeClass("collapsed");$("#child-container-0-3-1-0-0").removeClass("collapsed");$("#node-0-3-1-0-1").removeClass("collapsed");$("#child-container-0-3-1-0-1").removeClass("collapsed");$("#node-0-3-1-0-2").removeClass("collapsed");$("#child-container-0-3-1-0-2").removeClass("collapsed");$("#node-0-3-1-0-3").removeClass("collapsed");$("#child-container-0-3-1-0-3").removeClass("collapsed");$("#node-0-3-1-0-4").removeClass("collapsed");$("#child-container-0-3-1-0-4").removeClass("collapsed");$("#node-0-3-1-0-5").removeClass("collapsed");$("#child-container-0-3-1-0-5").removeClass("collapsed");$("#node-0-3-1-0-6").removeClass("collapsed");$("#child-container-0-3-1-0-6").removeClass("collapsed");$("#node-0-3-1-0-7").removeClass("collapsed");$("#child-container-0-3-1-0-7").removeClass("collapsed");$("#node-0-3-1-0-8").removeClass("collapsed");$("#child-container-0-3-1-0-8").removeClass("collapsed");$("#node-0-3-1-0-9").removeClass("collapsed");$("#child-container-0-3-1-0-9").removeClass("collapsed");$("#node-0-3-1-0-10").removeClass("collapsed");$("#child-container-0-3-1-0-10").removeClass("collapsed");$("#node-0-3-1-0-11").removeClass("collapsed");$("#child-container-0-3-1-0-11").removeClass("collapsed");$("#node-0-3-1-0-12").removeClass("collapsed");$("#child-container-0-3-1-0-12").removeClass("collapsed");$("#node-0-3-1-0-13").removeClass("collapsed");$("#child-container-0-3-1-0-13").removeClass("collapsed");$("#node-0-3-1-0-14").removeClass("collapsed");$("#child-container-0-3-1-0-14").removeClass("collapsed");$("#node-0-3-1-0-15").removeClass("collapsed");$("#child-container-0-3-1-0-15").removeClass("collapsed");$("#node-0-3-1-0-16").removeClass("collapsed");$("#child-container-0-3-1-0-16").removeClass("collapsed");$("#node-0-3-1-0-17").removeClass("collapsed");$("#child-container-0-3-1-0-17").removeClass("collapsed");$("#node-0-3-1-0-18").removeClass("collapsed");$("#child-container-0-3-1-0-18").removeClass("collapsed");$("#node-0-3-1-0-19").removeClass("collapsed");$("#child-container-0-3-1-0-19").removeClass("collapsed");$("#node-0-3-1-0-20").removeClass("collapsed");$("#child-container-0-3-1-0-20").removeClass("collapsed");$("#node-0-3-1-0-21").removeClass("collapsed");$("#child-container-0-3-1-0-21").removeClass("collapsed");$("#node-0-3-1-0-22").removeClass("collapsed");$("#child-container-0-3-1-0-22").removeClass("collapsed");$("#node-0-3-1-0-23").removeClass("collapsed");$("#child-container-0-3-1-0-23").removeClass("collapsed");$("#node-0-3-1-0-24").removeClass("collapsed");$("#child-container-0-3-1-0-24").removeClass("collapsed");$("#node-0-3-1-0-25").removeClass("collapsed");$("#child-container-0-3-1-0-25").removeClass("collapsed");$("#node-0-3-1-0-26").removeClass("collapsed");$("#child-container-0-3-1-0-26").removeClass("collapsed");$("#node-0-3-1-0-27").removeClass("collapsed");$("#child-container-0-3-1-0-27").removeClass("collapsed");$("#node-0-3-1-0-28").removeClass("collapsed");$("#child-container-0-3-1-0-28").removeClass("collapsed");$("#node-0-3-1-0-29").removeClass("collapsed");$("#child-container-0-3-1-0-29").removeClass("collapsed");$("#node-0-3-1-0-30").removeClass("collapsed");$("#child-container-0-3-1-0-30").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-0--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-8--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-9--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-10--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-11--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-12--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-13--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-14--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-15--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-16--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-17--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-18--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-19--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-20--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-21--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-22--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-23--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-24--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-25--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-26--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-27--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-28--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-29--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-0-30--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-1--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-2--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-3--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-4--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-5--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-6--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0-3-1-7--1").addClass("shown").removeClass("collapsed");$("#child-indicator-after-node-0--1").addClass("shown").removeClass("collapsed");$("#msg-0").removeClass("collapsed");$("#msg-1").removeClass("collapsed");$("#msg-2").removeClass("collapsed");$("#msg-3").removeClass("collapsed");$("#msg-4").removeClass("collapsed");$("#msg-5").removeClass("collapsed");$("#msg-6").removeClass("collapsed")}
+
+    }
+
+    $("#button-prev").on("click", () => {
+        if (step > 0) step -= 1;
+        applyStep();
+    })
+    $("#button-next").on("click", () => {
+        if (step + 1 < numSteps) step += 1;
+        applyStep();
+    })
+    function animateStep() {
+        $('#button-bar').css({'display': 'none'})
+        setTimeout(() => {
+            if (step + 1 < numSteps) {
+                step += 1;
+                applyStep();
+                /*var leftCol = $('.column-left').get(0);
+                leftCol.scrollTo({top: leftCol.scrollHeight, behavior: 'smooth'});*/
+                animateStep();
+            } else {
+                $('#button-bar').css({'display': 'unset'})
+            }
+        }, 2000)
+    }
+    $("#button-animate").on("click", () => {
+        step = 0;
+        animateStep();
+    })
+    applyStep();
+
+    function keyPress(e) {
+        if(e.key === 'a') {
+            $('#button-animate').click();
+        }
+    }
+    document.addEventListener("keydown", keyPress, false);
+
+
+</script>
+<script type="text/javascript">
+    function scaleContent() {
+        var container = $('.container');
+        var content = $('.column-right-scaling');
+        // Get container and content dimensions
+        var containerWidth = container.width();
+        var containerHeight = container.height();
+        var contentWidth = content[0].scrollWidth;
+        var contentHeight = content[0].scrollHeight;
+        // Calculate scale factors
+        var scaleX = containerWidth / contentWidth;
+        var scaleY = containerHeight / contentHeight;
+        // Use the smaller scale factor to ensure the content fits both dimensions
+        var scale = Math.min(scaleX, scaleY, 1);
+        // Apply the scale transformation
+        content.css({
+            'transform': 'scale(' + scale + ')'
+        });
+    }
+
+    // Also observe changes in the content's size via the ResizeObserver (for better handling)
+    var resizeObserver = new ResizeObserver(function (entries) {
+        for (let entry of entries) {
+            if (entry.target.matches('.column-right-scaling')) {
+                scaleContent();
+            }
+        }
+    });
+
+    function toggleScalingOrScrolling() {
+        let scale = $('#scale-or-scroll-checkbox').get(0).checked
+        if (scale) {
+            $('#tree-column').addClass('column-right-scaling').removeClass('column-right-scrolling');
+            resizeObserver.observe($('.column-right-scaling').get(0))
+        } else {
+            resizeObserver.disconnect()
+            $('.column-right-scaling').css('transform', 'none');
+            $('#tree-column').addClass('column-right-scrolling').removeClass('column-right-scaling');
+        }
+
+    }
+</script>
+
+</body>
+</html>

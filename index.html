@@ -1,0 +1,265 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <title>Episodic Memory Verbalization using Hierarchical Representations of Life-Long Robot Experience</title>
+
+    <meta name="author" content="Jon Barron">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="data/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+
+</head>
+
+<body>
+<table class="main-table">
+    <tbody>
+    <tr style="padding:0px">
+        <td style="padding:0px">
+            <p class="name" style="text-align: center;">
+                Episodic Memory Verbalization using Hierarchical Representations of Life-Long Robot Experience
+            </p>
+            <br/>
+            <br/>
+            <div class="row justify-content-md-center">
+                <div class="col-md-2 text-center">
+                    <a href="https://github.com/anonymousresearcher05/h-emv">
+                        <image src="data/github.png" height="60px"></image>
+                        <h4><strong>Code</strong></h4>
+                    </a>
+                </div>
+                <div class="col-md-2 text-center">
+                    <a href="https://github.com/anonymousresearcher05/h-emv/tree/main/data">
+                        <image src="data/data.png" height="40px" style="margin: 10px 0"></image>
+                        <h4><strong>Data</strong></h4>
+                    </a>
+                </div>
+            </div>
+
+            <hr/>
+
+            <div class="row">
+                <div class="col-md-12">
+                    <h2>Abstract</h2>
+                    <p>
+                        Verbalization of robot experience, i.e., summarization of and question answering about a robot's
+                        past, is a crucial ability for improving human-robot interaction. Previous works applied
+                        rule-based systems or fine-tuned deep models to verbalize short (several-minute-long) streams of
+                        episodic data, limiting generalization and transferability. In our work, we apply large
+                        pretrained models to tackle this task with zero or few examples, and specifically focus on
+                        verbalizing life-long experiences. For this, we derive a tree-like data structure from episodic
+                        memory (EM), with lower levels representing raw perception and proprioception data, and higher
+                        levels abstracting events to natural language concepts. Given such a hierarchical representation
+                        built from the experience stream, we apply a large language model as an agent to interactively
+                        search the EM given a user's query, dynamically expanding (initially collapsed) tree nodes to
+                        find the relevant information. The approach keeps computational costs low even when scaling to
+                        months of robot experience data. We evaluate our method on simulated household robot data, human
+                        egocentric videos, and real-world robot recordings, demonstrating its flexibility and
+                        scalability.
+                    </p>
+                </div>
+            </div>
+
+            <hr/>
+
+            <div class="row">
+                <div class="col-12">
+                    <h2>Method</h2>
+                    <p>
+                        Our goal is to enable an artificial agent to verbalize and answer questions about its past.
+                        Given the continuous, multimodal stream of experiences of a robot agent, we build up a
+                        hierarchical and interpretable representation of EM. The lower levels of this hierarchy are
+                        predefined and span raw experiences, events, and planning-level goals. Higher levels are then
+                        constructed by recursively summarizing the representations of the previous level, thus building
+                        EM of hours, days, weeks or months.
+                    </p>
+                    <p>
+                        When a user later asks a question, our system needs to retrieve the relevant information from
+                        the EM to respond to the user's query. This is done by an LLM interactively explores the history
+                        tree to gather relevant information.
+                        We model this process using an "LLM as agent"-approach: The tree representation of the agent's
+                        history is initially in a collapsed state, i.e., only the top-level node's content is visible.
+                        Given the user's query and the history tree, an LLM is iteratively asked to invoke functions to
+                        gather the relevant information, or respond with the answer if sufficient details have been
+                        collected. Specifically, the LLM can interactively expand certain nodes of the tree to search
+                        for relevant details, ask helper models to inspect low-level information (e.g., to perform
+                        visual question-answering on images), or perform other computations in a Python console.
+                    </p>
+                </div>
+            </div>
+
+            <hr/>
+
+            <br/><br/>
+            <div class="row">
+                <div class="col-md-12">
+                    <h2>Evaluation samples</h2>
+                    <p>
+                        Here, we show traces of the LLM dynamically exploring the history tree from our experiments in
+                        the paper. Select the dataset on the left and the sample on the right. For Ego4D and the
+                        real-world robot experiments, this is the full set of evaluation samples from the paper.
+                        For TEACh, this is a small selection showcasing some success and failure cases.
+                    </p>
+                </div>
+                <br>
+                <div class="col-sm-6">
+                    <select class="form-select" id="dataset-select" onchange="changeDemoSample()">
+                        <option>Real-Robot</option>
+                        <option>Ego4D</option>
+                        <option>TEACh</option>
+                    </select>
+                </div>
+                <div class="col-sm-6">
+                    <select class="form-select sample-select" id="sample-select-robot" onchange="changeDemoSample()">
+                        <option>action-detail-1</option>
+                        <option>action-detail-2</option>
+                        <option>action-detail-3</option>
+                        <option>action-detail-4</option>
+                        <option>action-detail-5</option>
+                        <option>events-1</option>
+                        <option>events-2</option>
+                        <option>events-3</option>
+                        <option>events-4</option>
+                        <option>events-5</option>
+                        <option>events-6</option>
+                        <option>events-7</option>
+                        <option>explain-1</option>
+                        <option>explain-2</option>
+                        <option>explain-3</option>
+                        <option>explain-4</option>
+                        <option>explain-5</option>
+                        <option>objects-1</option>
+                        <option>objects-2</option>
+                        <option>objects-3</option>
+                        <option>objects-4</option>
+                        <option>objects-5</option>
+                        <option>objects-6</option>
+                        <option>objects-7</option>
+                        <option>problems-1</option>
+                        <option>problems-2</option>
+                        <option>problems-3</option>
+                        <option>req-at-time-1</option>
+                        <option>req-at-time-2</option>
+                        <option>req-at-time-3</option>
+                    </select>
+                    <select class="form-select sample-select" id="sample-select-ego4d" onchange="changeDemoSample()">
+                        <option>8fafc0-1-q0</option>
+                        <option>8fafc0-1-q1</option>
+                        <option>8fafc0-1-q2</option>
+                        <option>8fafc0-1-q3</option>
+                        <option>8fafc0-1-q4</option>
+                        <option>8fafc0-1-q5</option>
+                        <option>8fafc0-1-q6</option>
+                        <option>8fafc0-1-q7</option>
+                        <option>8fafc0-1-q8</option>
+                        <option>8fafc0-1-q9</option>
+                        <option>8fafc0-1-q10</option>
+                        <option>8fafc0-1-q11</option>
+                        <option>8fafc0-1-q12</option>
+                        <option>8fafc0-1-q13</option>
+                        <option>8fafc0-1-q14</option>
+                        <option>878666-0-q0</option>
+                        <option>878666-0-q1</option>
+                        <option>878666-0-q2</option>
+                        <option>878666-0-q3</option>
+                        <option>878666-0-q4</option>
+                        <option>878666-0-q5</option>
+                        <option>878666-0-q6</option>
+                        <option>878666-0-q7</option>
+                        <option>878666-0-q8</option>
+                        <option>878666-0-q9</option>
+                        <option>878666-0-q10</option>
+                        <option>878666-0-q11</option>
+                        <option>c43338-e83770-6b0f2b-2-q0</option>
+                        <option>c43338-e83770-6b0f2b-2-q1</option>
+                        <option>c43338-e83770-6b0f2b-2-q2</option>
+                        <option>c43338-e83770-6b0f2b-2-q3</option>
+                        <option>c43338-e83770-6b0f2b-2-q4</option>
+                        <option>c43338-e83770-6b0f2b-2-q5</option>
+                        <option>c43338-e83770-6b0f2b-2-q6</option>
+                        <option>c43338-e83770-6b0f2b-2-q7</option>
+                        <option>c43338-e83770-6b0f2b-2-q8</option>
+                        <option>c43338-e83770-6b0f2b-2-q9</option>
+                        <option>c43338-e83770-6b0f2b-2-q10</option>
+                        <option>c43338-e83770-6b0f2b-2-q11</option>
+                        <option>c43338-e83770-6b0f2b-2-q12</option>
+                    </select>
+                    <select class="form-select sample-select" id="sample-select-teach" onchange="changeDemoSample()">
+                        <option>sample-1-0shot_25-seq_simple_object_yes_no</option>
+                        <option>sample-2-0shot_25-days_ago_to_episode</option>
+                        <option>sample-3-0shot_25-sequence_of_task_descs</option>
+                        <option>sample-4-0shot_5-seq_right_before_questions</option>
+                        <option>sample-5-0shot_5-tasks_to_days_ago</option>
+                        <option>sample-6-0shot_5-seq_specific_shortened_low_actions</option>
+                        <option>sample-7-0shot_5-seq_low_actions_to_episode_task_descs</option>
+                        <option>sample-8-1shot_100-tasks_to_exact_times</option>
+                        <option>sample-9-1shot_100-exact_time_to_episode</option>
+                        <option>sample-10-1shot_100-seq_right_after_questions</option>
+                        <option>sample-11-1shot_25-seq_simple_object_yes_no</option>
+                        <option>sample-12-1shot_25-days_ago_to_episode</option>
+                        <option>sample-13-1shot_25-sequence_of_task_descs</option>
+                        <option>sample-14-1shot_5-seq_right_before_questions</option>
+                        <option>sample-15-1shot_5-tasks_to_days_ago</option>
+                        <option>sample-16-1shot_5-seq_specific_shortened_low_actions</option>
+                        <option>sample-17-1shot_5-seq_low_actions_to_episode_task_descs</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <iframe class="demo-sample-frame" id="eval-sample-frame" src="about:blank"></iframe>
+                </div>
+            </div>
+
+            <hr/>
+
+
+            <table style="width:100%;border:0px;border-spacing:0px;border-collapse:separate;margin-right:auto;margin-left:auto;">
+                <tbody>
+                <tr>
+                    <td style="padding:0px">
+                        <br>
+                        <p style="text-align:right;font-size:small;">
+                            This website is based on <a href="https://github.com/jonbarron/jonbarron_website">Jon
+                            Barron's source code</a>.
+                        </p>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<script>
+    function changeDemoSample() {
+        const dataset = $('#dataset-select').get(0).value
+        let select
+        $('.sample-select').css('display', 'none')
+        switch (dataset) {
+            case 'Real-Robot':
+                select = '#sample-select-robot'
+                break
+            case 'Ego4D':
+                select = '#sample-select-ego4d'
+                break
+            case 'TEACh':
+                select = '#sample-select-teach'
+                break
+            default:
+                alert('Invalid option ' + dataset);
+        }
+        $(select).css('display', 'unset')
+        const sample = $(select).get(0).value
+        $('#eval-sample-frame').attr('src', `eval-samples/${dataset}/${sample}.html`);
+    }
+
+    changeDemoSample()
+
+    $('textarea').on('click', ev => ev.target.select());
+</script>
+
+</body>
+</html>
